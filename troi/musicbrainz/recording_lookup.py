@@ -16,6 +16,8 @@ class RecordingLookupElement(Element):
 
     SERVER_URL = "https://api.listenbrainz.org/1/metadata/recording"
 
+    LISTENBRAINZ_MAX_RECORDING_COUNT = 1000
+
     def __init__(self, skip_not_found=True, lookup_tags=False, tag_threshold=None):
         Element.__init__(self)
         self.skip_not_found = skip_not_found
@@ -47,21 +49,25 @@ class RecordingLookupElement(Element):
         if self.lookup_tags:
             inc += " tag"
 
-        while True:
-            r = requests.post(self.SERVER_URL, json={"recording_mbids": recording_mbids, "inc": inc})
-            if r.status_code == 429:
-                sleep(2)
-                continue
+        data = {}
 
-            if r.status_code != 200:
-                raise PipelineError("Cannot fetch recordings from ListenBrainz: HTTP code %d (%s)" % (r.status_code, r.text))
+        for base_idx in range(0, len(recording_mbids), self.LISTENBRAINZ_MAX_RECORDING_COUNT):
+            while True:
+                mbids = recording_mbids[base_idx: base_idx + self.LISTENBRAINZ_MAX_RECORDING_COUNT]
+                r = requests.post(self.SERVER_URL, json={"recording_mbids": mbids, "inc": inc})
+                if r.status_code == 429:
+                    sleep(2)
+                    continue
 
-            break
+                if r.status_code != 200:
+                    raise PipelineError("Cannot fetch recordings from ListenBrainz: HTTP code %d (%s)" % (r.status_code, r.text))
 
-        try:
-            data = ujson.loads(r.text)
-        except ValueError as err:
-            raise PipelineError("Cannot parse recordings: " + str(err))
+                try:
+                    parsed = ujson.loads(r.text)
+                    data.update(parsed)
+                    break
+                except ValueError as err:
+                    raise PipelineError("Cannot parse recordings: " + str(err))
 
         output = []
         for r in recordings:
