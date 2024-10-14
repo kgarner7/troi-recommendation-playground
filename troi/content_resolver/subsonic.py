@@ -237,7 +237,7 @@ class SubsonicDatabase(Database):
 
 
 
-    def upload_playlist(self, playlist):
+    def upload_playlist(self, playlist, subsonic_id):
         """
             Given a Troi playlist, upload the playlist to the subsonic API.
         """
@@ -253,4 +253,7 @@ class SubsonicDatabase(Database):
             except KeyError:
                 continue
 
-        conn.createPlaylist(name=playlist.playlists[0].name, songIds=song_ids)
+        if subsonic_id:
+            conn.createPlaylist(playlistId=subsonic_id, songIds=song_ids)
+        else:
+            conn.createPlaylist(name=playlist.playlists[0].name, songIds=song_ids)
